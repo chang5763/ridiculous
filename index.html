@@ -1,0 +1,1505 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>赤壁之戰 · 3D 戰史運鏡特輯</title>
+<meta name="description" content="以 3D 運鏡與特效重現西元208年赤壁之戰：地形、船艦、將領、陣型、計策與火攻，可互動可自動播放。" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@600;700;900&family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cao:#3b7dd8;        /* 曹操 藍 */
+    --cao-glow:#7fb4ff;
+    --sun:#e3403b;        /* 孫權 紅 */
+    --sun-glow:#ff7d78;
+    --liu:#36ad55;        /* 劉備 綠 */
+    --liu-glow:#7cf09a;
+    --gold:#e8c46a;
+    --ink:#0c1320;
+    --panel:rgba(10,16,28,0.72);
+    --panel-solid:rgba(10,16,28,0.92);
+    --line:rgba(232,196,106,0.35);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{width:100%;height:100%;overflow:hidden;background:#05070d;color:#eaf0fb;
+    font-family:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;}
+  #app{position:fixed;inset:0;}
+  canvas{display:block;}
+
+  /* ---------- 載入畫面 ---------- */
+  #loader{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:22px;
+    background:radial-gradient(circle at 50% 35%,#15233f 0%,#070b14 70%);}
+  #loader .seal{font-family:"Noto Serif TC",serif;font-weight:900;font-size:13vw;color:var(--gold);
+    letter-spacing:.15em;text-shadow:0 0 40px rgba(232,196,106,.45);line-height:1;}
+  #loader .sub{color:#9fb2d4;letter-spacing:.5em;font-size:15px;}
+  #loadbar{width:240px;height:4px;background:rgba(255,255,255,.12);border-radius:4px;overflow:hidden;}
+  #loadbar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--gold),#fff6d8);
+    transition:width .3s ease;}
+  #loadmsg{color:#7e90b2;font-size:13px;letter-spacing:.1em;}
+
+  /* ---------- 開場選單 ---------- */
+  #intro{position:fixed;inset:0;z-index:55;display:none;flex-direction:column;
+    align-items:center;justify-content:center;gap:26px;text-align:center;
+    background:radial-gradient(ellipse at 50% 30%,rgba(20,34,60,.55) 0%,rgba(5,8,15,.92) 75%);
+    backdrop-filter:blur(2px);}
+  #intro h1{font-family:"Noto Serif TC",serif;font-weight:900;font-size:clamp(40px,9vw,104px);
+    letter-spacing:.12em;color:#fff;
+    background:linear-gradient(180deg,#fff 0%,var(--gold) 90%);-webkit-background-clip:text;background-clip:text;
+    -webkit-text-fill-color:transparent;filter:drop-shadow(0 6px 26px rgba(232,196,106,.35));}
+  #intro .tag{color:#bcd0f0;letter-spacing:.4em;font-size:clamp(12px,2.4vw,17px);margin-top:-8px;}
+  #intro .desc{max-width:560px;color:#9fb2d4;line-height:1.9;font-size:14px;padding:0 20px;}
+  .mode-row{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;margin-top:6px;}
+  .mode-btn{cursor:pointer;border:1px solid var(--line);background:var(--panel);color:#eaf0fb;
+    padding:16px 30px;border-radius:14px;font-size:16px;font-weight:700;letter-spacing:.08em;
+    transition:.2s;min-width:190px;backdrop-filter:blur(6px);}
+  .mode-btn b{display:block;font-size:20px;margin-bottom:4px;color:var(--gold);}
+  .mode-btn span{font-size:12px;color:#9fb2d4;font-weight:400;letter-spacing:.04em;}
+  .mode-btn:hover{transform:translateY(-3px);border-color:var(--gold);
+    box-shadow:0 10px 30px rgba(0,0,0,.5),0 0 0 1px var(--gold) inset;}
+  .legend-row{display:flex;gap:20px;margin-top:8px;font-size:13px;color:#cdd9ef;}
+  .legend-row i{display:inline-block;width:13px;height:13px;border-radius:3px;margin-right:7px;vertical-align:-1px;}
+
+  /* ---------- HUD 共用 ---------- */
+  .panel{position:fixed;background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;backdrop-filter:blur(10px);box-shadow:0 8px 30px rgba(0,0,0,.45);z-index:20;}
+  .hud-hidden{display:none !important;}
+
+  /* 頂部標題列 */
+  #topbar{top:14px;left:50%;transform:translateX(-50%);padding:9px 26px;display:flex;
+    align-items:center;gap:16px;border-radius:40px;}
+  #topbar .t1{font-family:"Noto Serif TC",serif;font-weight:900;font-size:20px;letter-spacing:.18em;color:var(--gold);}
+  #topbar .t2{font-size:12px;color:#9fb2d4;letter-spacing:.25em;border-left:1px solid var(--line);padding-left:14px;}
+
+  /* 左側:當前階段敘事 */
+  #narr{top:74px;left:14px;width:330px;padding:16px 18px;}
+  #narr .era{font-size:12px;color:var(--gold);letter-spacing:.2em;}
+  #narr .ph-name{font-family:"Noto Serif TC",serif;font-weight:900;font-size:25px;margin:3px 0 4px;
+    color:#fff;letter-spacing:.04em;}
+  #narr .ph-no{font-size:12px;color:#7e90b2;letter-spacing:.1em;margin-bottom:10px;}
+  #narr .ph-desc{font-size:13.5px;line-height:1.85;color:#d4ddf0;}
+  #strat{margin-top:13px;padding:11px 13px;border-radius:10px;display:none;
+    background:linear-gradient(135deg,rgba(232,196,106,.18),rgba(232,196,106,.04));
+    border:1px solid rgba(232,196,106,.45);}
+  #strat .lab{font-size:11px;color:var(--gold);letter-spacing:.25em;}
+  #strat .nm{font-family:"Noto Serif TC",serif;font-weight:900;font-size:19px;color:#ffe9a8;margin:2px 0 4px;}
+  #strat .ds{font-size:12.5px;line-height:1.7;color:#e6dcc0;}
+
+  /* 右側:三方戰力卡 */
+  #forces{top:74px;right:14px;width:264px;padding:14px 15px;}
+  #forces .hd{font-size:12px;color:var(--gold);letter-spacing:.22em;margin-bottom:11px;text-align:center;}
+  .fc{margin-bottom:13px;}
+  .fc:last-child{margin-bottom:2px;}
+  .fc .row1{display:flex;align-items:center;gap:8px;margin-bottom:5px;}
+  .fc .dot{width:14px;height:14px;border-radius:4px;flex:none;box-shadow:0 0 9px currentColor;}
+  .fc .lord{font-weight:900;font-size:16px;}
+  .fc .cmd{font-size:11.5px;color:#9fb2d4;margin-left:auto;}
+  .fc .bar{height:9px;border-radius:6px;background:rgba(255,255,255,.09);overflow:hidden;margin:3px 0;}
+  .fc .bar i{display:block;height:100%;border-radius:6px;transition:width .8s cubic-bezier(.4,0,.2,1);}
+  .fc .meta{display:flex;justify-content:space-between;font-size:11px;color:#aebcd6;}
+  .fc .status{font-size:11.5px;margin-top:3px;color:#e7c98a;letter-spacing:.02em;}
+  .fc .gens{font-size:10.5px;color:#8194b4;margin-top:3px;line-height:1.5;}
+
+  /* 天氣 / 風向 */
+  #weather{top:74px;right:288px;width:104px;padding:11px;text-align:center;}
+  #weather .hd{font-size:11px;color:var(--gold);letter-spacing:.18em;margin-bottom:7px;}
+  #compass{width:64px;height:64px;margin:0 auto 6px;position:relative;border-radius:50%;
+    border:1px solid var(--line);background:radial-gradient(circle,rgba(255,255,255,.06),transparent);}
+  #compass .n{position:absolute;top:2px;left:50%;transform:translateX(-50%);font-size:9px;color:#7e90b2;}
+  #wind-arrow{position:absolute;top:50%;left:50%;width:3px;height:26px;border-radius:3px;
+    background:linear-gradient(180deg,var(--gold),#fff);transform-origin:bottom center;
+    transform:translate(-50%,-100%) rotate(0deg);transition:transform 1s ease;}
+  #wind-arrow::after{content:"";position:absolute;top:-6px;left:50%;transform:translateX(-50%);
+    border-left:5px solid transparent;border-right:5px solid transparent;border-bottom:8px solid #fff;}
+  #weather .wtxt{font-size:12.5px;color:#eaf0fb;font-weight:700;}
+  #weather .wsub{font-size:10px;color:#9fb2d4;margin-top:1px;}
+
+  /* 事件快報 ticker */
+  #events{bottom:118px;left:14px;width:330px;max-height:140px;padding:11px 14px;overflow:hidden;}
+  #events .hd{font-size:11px;color:var(--gold);letter-spacing:.2em;margin-bottom:7px;}
+  #events ul{list-style:none;}
+  #events li{font-size:12.5px;line-height:1.6;color:#cdd9ef;margin-bottom:5px;padding-left:14px;position:relative;
+    opacity:0;transform:translateX(-8px);animation:evin .5s forwards;}
+  #events li::before{content:"▸";position:absolute;left:0;color:var(--gold);}
+  @keyframes evin{to{opacity:1;transform:none;}}
+
+  /* 底部時間軸 */
+  #timeline{bottom:14px;left:50%;transform:translateX(-50%);width:min(960px,94vw);padding:12px 18px 14px;}
+  .tl-track{position:relative;height:46px;margin:4px 6px 0;}
+  .tl-line{position:absolute;top:13px;left:0;right:0;height:3px;background:rgba(255,255,255,.14);border-radius:3px;}
+  .tl-prog{position:absolute;top:13px;left:0;height:3px;width:0;border-radius:3px;
+    background:linear-gradient(90deg,var(--gold),#fff6d8);transition:width .25s linear;}
+  .tl-node{position:absolute;top:6px;transform:translateX(-50%);cursor:pointer;text-align:center;}
+  .tl-node .dot{width:17px;height:17px;border-radius:50%;border:2px solid #6c7ea0;background:#0c1320;
+    margin:0 auto;transition:.2s;}
+  .tl-node .lab{font-size:10px;color:#8194b4;margin-top:4px;white-space:nowrap;transition:.2s;
+    max-width:64px;overflow:hidden;text-overflow:ellipsis;}
+  .tl-node:hover .dot{border-color:var(--gold);transform:scale(1.15);}
+  .tl-node.active .dot{border-color:var(--gold);background:var(--gold);
+    box-shadow:0 0 14px var(--gold);transform:scale(1.25);}
+  .tl-node.active .lab{color:var(--gold);font-weight:700;}
+  .tl-node.done .dot{border-color:var(--gold);background:rgba(232,196,106,.4);}
+
+  .tl-ctrl{display:flex;align-items:center;gap:10px;justify-content:center;margin-top:6px;}
+  .tl-ctrl button{cursor:pointer;border:1px solid var(--line);background:rgba(255,255,255,.05);
+    color:#eaf0fb;width:36px;height:36px;border-radius:9px;font-size:15px;transition:.18s;
+    display:flex;align-items:center;justify-content:center;}
+  .tl-ctrl button:hover{border-color:var(--gold);background:rgba(232,196,106,.14);}
+  .tl-ctrl #play{width:46px;height:46px;font-size:19px;background:var(--gold);color:#0c1320;border:none;}
+  .tl-ctrl #play:hover{background:#fff0c4;}
+  .tl-ctrl .sp{font-size:12px;color:#9fb2d4;cursor:pointer;padding:7px 11px;border:1px solid var(--line);
+    border-radius:9px;user-select:none;}
+  .tl-ctrl .sp:hover{border-color:var(--gold);}
+
+  /* 右下角工具列 */
+  #tools{bottom:14px;right:14px;display:flex;flex-direction:column;gap:8px;align-items:flex-end;z-index:21;}
+  .tool-btn{cursor:pointer;border:1px solid var(--line);background:var(--panel);color:#eaf0fb;
+    padding:9px 13px;border-radius:10px;font-size:12.5px;letter-spacing:.05em;transition:.18s;
+    backdrop-filter:blur(8px);display:flex;align-items:center;gap:7px;white-space:nowrap;}
+  .tool-btn:hover{border-color:var(--gold);}
+  .tool-btn.on{border-color:var(--gold);background:rgba(232,196,106,.16);color:var(--gold);}
+  .tool-btn .ic{font-size:14px;}
+
+  /* 計策大字幕 */
+  #banner{position:fixed;top:42%;left:50%;transform:translate(-50%,-50%) scale(.7);z-index:40;
+    text-align:center;opacity:0;pointer-events:none;}
+  #banner.show{animation:bannerPop 2.6s ease forwards;}
+  #banner .bn-tag{font-size:14px;letter-spacing:.6em;color:var(--gold);margin-bottom:6px;}
+  #banner .bn-name{font-family:"Noto Serif TC",serif;font-weight:900;font-size:72px;color:#fff;
+    text-shadow:0 0 30px rgba(232,196,106,.7),0 4px 20px rgba(0,0,0,.6);letter-spacing:.1em;}
+  #banner .bn-sub{font-size:16px;color:#ffe9a8;margin-top:8px;letter-spacing:.18em;}
+  @keyframes bannerPop{
+    0%{opacity:0;transform:translate(-50%,-50%) scale(.6);}
+    14%{opacity:1;transform:translate(-50%,-50%) scale(1.04);}
+    20%{transform:translate(-50%,-50%) scale(1);}
+    78%{opacity:1;transform:translate(-50%,-50%) scale(1);}
+    100%{opacity:0;transform:translate(-50%,-52%) scale(1.02);}
+  }
+
+  /* 選取單位資訊卡 */
+  #pick{position:fixed;z-index:30;display:none;padding:10px 13px;border-radius:11px;max-width:230px;
+    background:var(--panel-solid);border:1px solid var(--line);box-shadow:0 8px 26px rgba(0,0,0,.5);pointer-events:none;}
+  #pick .pk-nm{font-weight:900;font-size:15px;margin-bottom:3px;}
+  #pick .pk-ds{font-size:12px;color:#bcc9e3;line-height:1.6;}
+
+  /* 結束總結 */
+  #ending{position:fixed;inset:0;z-index:45;display:none;flex-direction:column;align-items:center;
+    justify-content:center;gap:18px;text-align:center;background:rgba(5,8,15,.82);backdrop-filter:blur(4px);}
+  #ending h2{font-family:"Noto Serif TC",serif;font-weight:900;font-size:clamp(30px,6vw,62px);color:var(--gold);
+    letter-spacing:.1em;}
+  #ending p{max-width:560px;color:#cdd9ef;line-height:2;font-size:15px;padding:0 24px;}
+  #ending .btns{display:flex;gap:14px;margin-top:8px;}
+
+  /* 提示淡出 */
+  #hint{position:fixed;bottom:188px;left:50%;transform:translateX(-50%);z-index:19;
+    font-size:12.5px;color:#9fb2d4;letter-spacing:.08em;background:rgba(10,16,28,.6);
+    padding:7px 16px;border-radius:20px;border:1px solid var(--line);transition:opacity 1s;}
+
+  @media (max-width:880px){
+    #narr{width:248px;font-size:12px;top:64px;}
+    #narr .ph-name{font-size:20px;}
+    #forces{width:210px;top:64px;}
+    #weather{display:none;}
+    #events{display:none;}
+    #topbar .t2{display:none;}
+    .tl-node .lab{display:none;}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- 載入 -->
+<div id="loader">
+  <div class="seal">赤壁</div>
+  <div class="sub">A&nbsp;D&nbsp;·&nbsp;2&nbsp;0&nbsp;8</div>
+  <div id="loadbar"><i></i></div>
+  <div id="loadmsg">正在佈署長江戰場…</div>
+</div>
+
+<!-- 開場 -->
+<div id="intro">
+  <h1>赤壁之戰</h1>
+  <div class="tag">3 D 戰 史 運 鏡 特 輯</div>
+  <div class="desc">西元208年，曹操率大軍南下，孫權、劉備聯軍於長江赤壁迎戰。<br>以電視特別節目的運鏡與特效，重現地形、船艦、陣型、將領與火攻全程。</div>
+  <div class="mode-row">
+    <div class="mode-btn" data-mode="auto"><b>▶ 自動播放</b><span>歷史節目 · 自動運鏡導覽</span></div>
+    <div class="mode-btn" data-mode="free"><b>✦ 互動探索</b><span>自由控制鏡頭與時間軸</span></div>
+  </div>
+  <div class="legend-row">
+    <span><i style="background:var(--cao)"></i>曹操軍</span>
+    <span><i style="background:var(--sun)"></i>孫權軍</span>
+    <span><i style="background:var(--liu)"></i>劉備軍</span>
+  </div>
+</div>
+
+<!-- HUD -->
+<div id="topbar" class="panel hud">
+  <span class="t1">赤壁之戰</span>
+  <span class="t2">建安十三年 · 長江 · 烏林 ⇄ 赤壁</span>
+</div>
+
+<div id="narr" class="panel hud">
+  <div class="era"></div>
+  <div class="ph-name"></div>
+  <div class="ph-no"></div>
+  <div class="ph-desc"></div>
+  <div id="strat">
+    <div class="lab">計策發動</div>
+    <div class="nm"></div>
+    <div class="ds"></div>
+  </div>
+</div>
+
+<div id="weather" class="panel hud">
+  <div class="hd">天 候</div>
+  <div id="compass"><span class="n">北</span><div id="wind-arrow"></div></div>
+  <div class="wtxt">—</div>
+  <div class="wsub">—</div>
+</div>
+
+<div id="forces" class="panel hud">
+  <div class="hd">各 軍 戰 力</div>
+</div>
+
+<div id="events" class="panel hud">
+  <div class="hd">戰 況 快 報</div>
+  <ul></ul>
+</div>
+
+<div id="timeline" class="panel hud">
+  <div class="tl-track">
+    <div class="tl-line"></div>
+    <div class="tl-prog"></div>
+  </div>
+  <div class="tl-ctrl">
+    <button id="prev" title="上一幕">⏮</button>
+    <button id="play" title="播放/暫停">▶</button>
+    <button id="next" title="下一幕">⏭</button>
+    <span class="sp" id="speed">速度 1×</span>
+  </div>
+</div>
+
+<div id="tools">
+  <div class="tool-btn on" id="t-cam"><span class="ic">🎥</span>自動運鏡</div>
+  <div class="tool-btn on" id="t-label"><span class="ic">🏷</span>地名標示</div>
+  <div class="tool-btn" id="t-help"><span class="ic">？</span>操作說明</div>
+</div>
+
+<div id="banner">
+  <div class="bn-tag">計 策 發 動</div>
+  <div class="bn-name"></div>
+  <div class="bn-sub"></div>
+</div>
+
+<div id="pick"><div class="pk-nm"></div><div class="pk-ds"></div></div>
+
+<div id="hint">滑鼠左鍵拖曳旋轉 · 滾輪縮放 · 右鍵平移 · 點擊船艦查看資訊</div>
+
+<div id="ending">
+  <h2>赤壁鏖兵 · 三分天下</h2>
+  <p>火攻一夜，曹操水軍盡焚於烏林，引兵北還，無力南進。<br>孫劉聯軍以寡擊眾，奠定魏、蜀、吳三國鼎立之勢。<br>赤壁之戰，遂成中國史上以少勝多、以火破船的經典戰役。</p>
+  <div class="btns">
+    <div class="mode-btn" id="replay"><b>↺ 重新播放</b><span>從序幕再看一次</span></div>
+    <div class="mode-btn" id="explore"><b>✦ 自由探索</b><span>停留戰場自由運鏡</span></div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* =====================================================================
+   赤壁之戰 3D 戰史 — 單檔互動視覺化
+   座標:長江沿 X 軸東流;北岸(烏林,曹軍) = +Z;南岸(赤壁,聯軍) = -Z
+   ===================================================================== */
+
+const COL = {
+  cao:0x3b7dd8, caoGlow:0x9ec6ff,
+  sun:0xe3403b, sunGlow:0xff8a85,
+  liu:0x36ad55, liuGlow:0x86f3a3,
+  gold:0xe8c46a
+};
+
+/* ---------- 三方資料 ---------- */
+const FACTION = {
+  cao:{ name:'曹操軍', lord:'曹操', cmd:'丞相 · 親征',
+        color:COL.cao, glow:COL.caoGlow, css:'var(--cao)',
+        gens:'蔡瑁 · 張允 · 張遼 · 許褚 · 于禁 · 文聘',
+        baseTroops:240000 },
+  sun:{ name:'孫權軍', lord:'孫權', cmd:'大都督 周瑜',
+        color:COL.sun, glow:COL.sunGlow, css:'var(--sun)',
+        gens:'周瑜 · 程普 · 黃蓋 · 魯肅 · 甘寧 · 韓當',
+        baseTroops:30000 },
+  liu:{ name:'劉備軍', lord:'劉備', cmd:'軍師 諸葛亮',
+        color:COL.liu, glow:COL.liuGlow, css:'var(--liu)',
+        gens:'諸葛亮 · 關羽 · 張飛 · 趙雲 · 劉琦',
+        baseTroops:20000 }
+};
+const TROOP_MAX = 250000;
+
+/* ---------- 時間軸:十幕 ---------- */
+const PHASES = [
+  {
+    era:'建安十三年 · 秋', name:'曹操南征', sub:'CAO CAO MARCHES SOUTH',
+    desc:'曹操平定北方後揮師南下,輕取荊州,水陸大軍號稱八十萬,沿長江東進,直逼江東。聯軍兵力懸殊,天下震動。',
+    cam:{p:[210,170,250], t:[-40,0,50], orbit:0.02},
+    wind:{deg:200, txt:'西北風', sub:'隆冬 · 江寒'}, sky:['#16294a','#9fb6cc'], fog:[0x9fb6cc,260,900],
+    forces:{cao:{n:240000,s:'順流東下 · 號稱八十萬',ships:2000},
+            sun:{n:30000,s:'江東戒備 · 議和戰',ships:300},
+            liu:{n:20000,s:'敗退 · 退守夏口',ships:120}},
+    events:['曹操盡得荊州水軍,船艦相連','劉備自當陽敗走,退保夏口','江東震恐,降戰兩派相爭'],
+    fx:{caoMove:true}
+  },
+  {
+    era:'建安十三年 · 冬', name:'孫劉聯盟', sub:'THE ALLIANCE',
+    desc:'諸葛亮出使江東,舌戰群儒,力陳唇亡齒寒;魯肅居中斡旋,周瑜主戰。孫權拔劍斷案,決意抗曹,孫劉聯軍成形,屯於樊口、夏口。',
+    cam:{p:[250,120,-60], t:[170,0,-95], orbit:0.015},
+    wind:{deg:205, txt:'西北風', sub:'江霧漸起'}, sky:['#1b3050','#a6bdd2'], fog:[0xa6bdd2,240,880],
+    forces:{cao:{n:240000,s:'進駐烏林 · 列艦北岸',ships:2000},
+            sun:{n:30000,s:'周瑜領兵三萬 西上',ships:300},
+            liu:{n:20000,s:'結盟 · 合兵迎戰',ships:120}},
+    events:['諸葛亮舌戰群儒,促成同盟','周瑜為大都督,程普為副','孫劉聯軍約五萬,溯江西進'],
+    fx:{ally:true}
+  },
+  {
+    era:'兩軍對壘', name:'烏林對峙', sub:'STANDOFF AT WULIN',
+    desc:'曹軍列船於北岸烏林,聯軍據南岸赤壁,隔江相望。北方士卒不習水戰,風浪顛簸,加之疫病流行,曹軍初戰不利,退駐江北。',
+    cam:{p:[0,180,-300], t:[0,8,15], orbit:0.025},
+    wind:{deg:205, txt:'西北風', sub:'浪急 · 軍疫'}, sky:['#1d3354','#acc2d6'], fog:[0xacc2d6,260,900],
+    forces:{cao:{n:230000,s:'水土不服 · 疫病漸生',ships:2000},
+            sun:{n:30000,s:'據赤壁 · 列陣以待',ships:300},
+            liu:{n:20000,s:'江南岸 · 協同布防',ships:120}},
+    events:['曹軍初戰失利,退保北岸','北兵暈船,疫疾流行','兩軍隔江對峙,箭弩相向'],
+    fx:{volley:true}
+  },
+  {
+    era:'計策 · 其一', name:'反間計', sub:'THE PLANTED LETTER',
+    desc:'蔣幹過江說降,周瑜將計就計,偽造蔡瑁、張允通敵密信,佯醉令蔣幹盜去。曹操中計,斬水軍都督蔡瑁、張允——曹營頓失通曉水戰之將。',
+    cam:{p:[60,95,205], t:[15,2,105], orbit:0.012},
+    wind:{deg:200, txt:'西北風', sub:'夜 · 江風冷'}, sky:['#152743','#7d93b2'], fog:[0x7d93b2,230,860],
+    forces:{cao:{n:230000,s:'誤斬水軍都督!',ships:2000},
+            sun:{n:30000,s:'反間得逞 · 士氣升',ships:300},
+            liu:{n:20000,s:'靜觀其變',ships:120}},
+    events:['蔣幹過江,周瑜佯醉設局','蔡瑁、張允密信被盜','曹操誤殺水軍都督,悔之已晚'],
+    strat:{name:'反間計', desc:'借蔣幹之手送出偽信,使曹操自毀水戰統帥,北軍水師羣龍無首。', at:[15,3,95]}
+  },
+  {
+    era:'計策 · 其二', name:'草船借箭', sub:'BORROWING THE ARROWS',
+    desc:'大霧蔽江,諸葛亮率二十艘草船擂鼓佯攻。曹軍不辨虛實,萬箭齊發,盡插草束。比及霧散,孔明得箭十餘萬支,談笑而還。',
+    cam:{p:[70,72,25], t:[5,2,72], orbit:0.01},
+    wind:{deg:210, txt:'微風', sub:'濃霧 · 視線不明'}, sky:['#2a3a52','#cfd8e2'], fog:[0xc8d2dd,80,420],
+    forces:{cao:{n:230000,s:'霧中濫射 · 失箭十萬',ships:2000},
+            sun:{n:30000,s:'草船借箭 · 滿載而歸',ships:300},
+            liu:{n:20000,s:'孔明立奇功',ships:140}},
+    events:['江上大霧,諸葛亮乘霧佯攻','曹軍亂箭齊發,盡插草人','孔明借箭十餘萬,全身而退'],
+    strat:{name:'草船借箭', desc:'借濃霧與曹軍多疑,以草船受箭,不費一兵而得箭十萬。', at:[5,3,55]},
+    fx:{fog:true, borrowArrows:true}
+  },
+  {
+    era:'計策 · 其三', name:'連環計', sub:'CHAINING THE SHIPS',
+    desc:'龐統渡江獻策:北軍苦於暈船,何不以鐵索連舟、鋪板於上,使船穩如平地?曹操大喜,盡連戰船首尾。船陣雖穩,卻為日後火攻埋下殺機。',
+    cam:{p:[-50,82,165], t:[0,2,80], orbit:0.018},
+    wind:{deg:205, txt:'西北風', sub:'江面漸穩'}, sky:['#1a2c4b','#9bb1cc'], fog:[0x9bb1cc,250,880],
+    forces:{cao:{n:230000,s:'鐵索連環 · 船穩兵安',ships:2000},
+            sun:{n:30000,s:'暗喜 · 火攻有機',ships:300},
+            liu:{n:20000,s:'籌備火具',ships:140}},
+    events:['龐統獻連環之策','曹軍以鐵索連結戰船','船陣穩固,卻不利火險'],
+    strat:{name:'連環計', desc:'誘曹操鐵索連舟,船陣雖穩,然一船著火則全軍俱焚。', at:[0,3,72], chain:true}
+  },
+  {
+    era:'計策 · 其四', name:'苦肉計 · 詐降', sub:'THE FALSE SURRENDER',
+    desc:'老將黃蓋詐稱不滿周瑜,當眾受杖刑,血肉模糊;隨後密遣降書予曹操,約期來投。曹操信之,只待黃蓋之船渡江——火攻之餌已下。',
+    cam:{p:[-30,80,-185], t:[0,2,-95], orbit:0.015},
+    wind:{deg:200, txt:'西北風', sub:'夜將至'}, sky:['#15243f','#7e94b2'], fog:[0x7e94b2,240,860],
+    forces:{cao:{n:230000,s:'信黃蓋降 · 鬆懈防備',ships:2000},
+            sun:{n:30000,s:'苦肉計成 · 詐降約期',ships:300},
+            liu:{n:20000,s:'待東風 · 整備戰船',ships:140}},
+    events:['周瑜怒打黃蓋,眾將求情','黃蓋密書詐降曹操','曹操深信,單候黃蓋來降'],
+    strat:{name:'苦肉計', desc:'黃蓋自受重刑取信於曹,鋪設詐降火船之路。', at:[0,3,-85]}
+  },
+  {
+    era:'天時 · 借風', name:'借東風', sub:'SUMMONING THE EAST WIND',
+    desc:'隆冬多西北風,火攻反燒己軍。諸葛亮於南屏山築七星壇,披髮仗劍祭風。是夜三更,風向忽轉東南——天時既至,火攻可成!',
+    cam:{p:[-120,58,-135], t:[-150,18,-108], orbit:0.03},
+    wind:{deg:45, txt:'東南風 起!', sub:'風向逆轉 · 天時至'}, sky:['#241a3a','#6a5a86'], fog:[0x6a5a86,260,900],
+    forces:{cao:{n:230000,s:'渾然不覺 · 順風在敵',ships:2000},
+            sun:{n:30000,s:'東南風起 · 萬事俱備',ships:300},
+            liu:{n:20000,s:'諸葛祭風 · 火攻待發',ships:140}},
+    events:['諸葛亮築七星壇祭風','三更時分,風轉東南','「萬事俱備,只欠東風」已備'],
+    strat:{name:'借東風', desc:'借東南風之天時,使火順風撲向北岸曹船,反客為主。', at:[-150,20,-108], wind:true}
+  },
+  {
+    era:'決戰之夜', name:'火燒赤壁', sub:'FIRE UPON THE FLEET',
+    desc:'黃蓋率火船十艘,滿載薪草膏油,趁東南風直撲北岸。將近曹陣,同時舉火——火乘風勢,風助火威,鐵索連環之船一時俱燃,烈焰蔽天,曹軍水寨化為火海。',
+    cam:{p:[130,90,-55], t:[0,18,45], orbit:0.04},
+    wind:{deg:45, txt:'東南風 急', sub:'烈火 · 濃煙蔽天'}, sky:['#3a1408','#c8541e'], fog:[0xc8541e,200,820],
+    forces:{cao:{n:120000,s:'戰船盡焚 · 水寨火海',ships:300},
+            sun:{n:30000,s:'火攻奏效 · 全軍進擊',ships:300},
+            liu:{n:20000,s:'兩翼夾擊 · 掩殺',ships:140}},
+    events:['黃蓋火船趁風突入','火乘風勢,連環船俱焚','曹軍水寨大亂,人馬燒溺無數'],
+    strat:{name:'火攻 · 火砲齊發', desc:'火船撞陣、火箭火砲齊射,連環船無可遁逃,一夕焚盡。', at:[0,8,40], fire:true}
+  },
+  {
+    era:'戰後 · 潰走', name:'敗走華容', sub:'RETREAT THROUGH HUARONG',
+    desc:'曹操棄船登岸,引殘兵自烏林取道華容,泥濘難行,自相踐踏。聯軍水陸並追。華容道上,關羽念舊情,終放曹操北歸——赤壁之戰,三分天下之勢遂定。',
+    cam:{p:[-110,115,150], t:[-150,0,158], orbit:0.025},
+    wind:{deg:60, txt:'東南風 漸歇', sub:'餘燼 · 戰煙未散'}, sky:['#2a1a16','#8a6a5a'], fog:[0x8a6a5a,220,860],
+    forces:{cao:{n:100000,s:'潰不成軍 · 北歸殘部',ships:50},
+            sun:{n:30000,s:'大獲全勝 · 乘勝追擊',ships:300},
+            liu:{n:20000,s:'據荊州 · 三分有其一',ships:140}},
+    events:['曹操棄船,自華容道北逃','聯軍水陸並進,追殺曹軍','關羽華容道義釋曹操'],
+    fx:{rout:true}
+  }
+];
+
+/* ===================================================================== */
+let scene, camera, renderer, controls, clock, raycaster, pointer;
+let sky, water, particleTex, flagTex;
+let fireSys, smokeSys, emberSys, fogSys, windSys, arrowPool=[];
+let windArrowsGroup, chainGroup, fireShipGroup, routGroup;
+const caoShips=[], allyShips=[], pickables=[];
+const labelSprites=[], flagMeshes=[], waveTargets=[];
+let directionArrow;
+const fireEmitters=[];          // 火焰發射點(燃燒中的曹船)
+
+let autoCamera=true, autoPlay=false, playSpeed=1, started=false;
+let currentPhase=0, phaseElapsed=0;
+const PHASE_DUR = 13;           // 每幕自動播放秒數
+let userControlling=false, userReleaseT=0;
+const camPos = new THREE.Vector3(), camLook = new THREE.Vector3();
+let windDir = new THREE.Vector3(0,0,1), windStrength=0.4;
+let labelsVisible=true;
+
+const $ = s=>document.querySelector(s);
+const dom = {
+  loader:$('#loader'), loadbar:$('#loadbar i'), loadmsg:$('#loadmsg'),
+  intro:$('#intro'), banner:$('#banner'), pick:$('#pick'),
+  era:$('#narr .era'), phName:$('#narr .ph-name'), phNo:$('#narr .ph-no'), phDesc:$('#narr .ph-desc'),
+  strat:$('#strat'), stratNm:$('#strat .nm'), stratDs:$('#strat .ds'),
+  forces:$('#forces'), events:$('#events ul'),
+  windArrow:$('#wind-arrow'), wtxt:$('#weather .wtxt'), wsub:$('#weather .wsub'),
+  prog:$('.tl-prog'), track:$('.tl-track'), play:$('#play'),
+  ending:$('#ending'), hint:$('#hint')
+};
+
+/* ---------- 公用:圓形粒子貼圖 ---------- */
+function makeCircleTexture(){
+  const c=document.createElement('canvas'); c.width=c.height=64;
+  const g=c.getContext('2d');
+  const grd=g.createRadialGradient(32,32,0,32,32,32);
+  grd.addColorStop(0,'rgba(255,255,255,1)');
+  grd.addColorStop(0.3,'rgba(255,255,255,0.85)');
+  grd.addColorStop(1,'rgba(255,255,255,0)');
+  g.fillStyle=grd; g.fillRect(0,0,64,64);
+  const t=new THREE.CanvasTexture(c); return t;
+}
+
+/* ---------- 公用:文字 Sprite(地名/單位) ---------- */
+function roundRect(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);
+  g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
+
+function makeLabel(text, opts={}){
+  const fs=opts.fs||60, color=opts.color||'#ffffff', bg=opts.bg||null;
+  const serif=opts.serif?'"Noto Serif TC",serif':'"Noto Sans TC",sans-serif';
+  const c=document.createElement('canvas'); const g=c.getContext('2d');
+  const font=`${opts.weight||900} ${fs}px ${serif}`;
+  g.font=font; const pad=opts.pad||22;
+  const w=Math.ceil(g.measureText(text).width)+pad*2, h=fs+pad*2;
+  c.width=w; c.height=h; g.font=font; g.textAlign='center'; g.textBaseline='middle';
+  if(bg){ g.fillStyle=bg; roundRect(g,1,1,w-2,h-2,16); g.fill();
+          g.lineWidth=2; g.strokeStyle=opts.border||'rgba(232,196,106,.7)'; g.stroke(); }
+  g.lineWidth=fs*0.14; g.strokeStyle='rgba(0,0,0,0.88)'; g.lineJoin='round';
+  g.strokeText(text,w/2,h/2+2);
+  g.fillStyle=color; g.fillText(text,w/2,h/2+2);
+  const tex=new THREE.CanvasTexture(c); tex.minFilter=THREE.LinearFilter; tex.anisotropy=8;
+  const mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:opts.depthTest!==false,depthWrite:false});
+  const sp=new THREE.Sprite(mat);
+  const scale=opts.scale||10;
+  sp.scale.set(scale*w/h, scale, 1);
+  sp.userData.isLabel=true;
+  return sp;
+}
+
+/* ---------- 公用:軍旗貼圖 ---------- */
+function makeFlagTexture(char, bgHex){
+  const c=document.createElement('canvas'); c.width=128; c.height=160;
+  const g=c.getContext('2d');
+  const col='#'+new THREE.Color(bgHex).getHexString();
+  g.fillStyle=col; g.fillRect(0,0,128,160);
+  // 邊框
+  g.strokeStyle='rgba(255,255,255,.85)'; g.lineWidth=8; g.strokeRect(6,6,116,148);
+  // 三角缺口(旗尾)
+  g.fillStyle=col;
+  // 字
+  g.font='900 96px "Noto Serif TC",serif'; g.textAlign='center'; g.textBaseline='middle';
+  g.lineWidth=10; g.strokeStyle='rgba(0,0,0,.5)'; g.strokeText(char,64,84);
+  g.fillStyle='#ffffff'; g.fillText(char,64,84);
+  const t=new THREE.CanvasTexture(c); t.anisotropy=8; return t;
+}
+
+/* ---------- 軍旗(可飄動) ---------- */
+function makeFlag(char, colorHex, height=9){
+  const grp=new THREE.Group();
+  const pole=new THREE.Mesh(
+    new THREE.CylinderGeometry(0.22,0.28,height,8),
+    new THREE.MeshStandardMaterial({color:0x6b4a2a,roughness:.8}));
+  pole.position.y=height/2; grp.add(pole);
+  const knob=new THREE.Mesh(new THREE.SphereGeometry(0.5,10,8),
+    new THREE.MeshStandardMaterial({color:COL.gold,metalness:.6,roughness:.3,emissive:0x553f10}));
+  knob.position.y=height; grp.add(knob);
+  const fg=new THREE.PlaneGeometry(5.2,3.4,12,6);
+  const fm=new THREE.MeshStandardMaterial({map:makeFlagTexture(char,colorHex),side:THREE.DoubleSide,
+    roughness:.7, emissive:new THREE.Color(colorHex).multiplyScalar(0.12)});
+  const flag=new THREE.Mesh(fg,fm);
+  flag.position.set(2.7, height-1.9, 0);
+  flag.userData.base=fg.attributes.position.array.slice();
+  flag.userData.wave=Math.random()*10;
+  grp.add(flag); flagMeshes.push(flag);
+  grp.userData.flag=flag;
+  return grp;
+}
+
+/* ---------- 戰船 ---------- */
+function makeShip(faction, scale=1, withFlag=true){
+  const f=FACTION[faction];
+  const g=new THREE.Group();
+  // 船身
+  const hull=new THREE.Mesh(
+    new THREE.BoxGeometry(7,1.5,3),
+    new THREE.MeshStandardMaterial({color:0x5b3d22,roughness:.85}));
+  hull.position.y=0.75; g.add(hull);
+  // 船首尖
+  const bow=new THREE.Mesh(new THREE.ConeGeometry(1.5,3,4),
+    new THREE.MeshStandardMaterial({color:0x4a3119,roughness:.85}));
+  bow.rotation.z=-Math.PI/2; bow.rotation.y=Math.PI/4; bow.position.set(4.8,0.8,0); g.add(bow);
+  // 甲板樓
+  const deck=new THREE.Mesh(new THREE.BoxGeometry(3.2,1.6,2.2),
+    new THREE.MeshStandardMaterial({color:0x7a5230,roughness:.8}));
+  deck.position.set(-0.8,2.1,0); g.add(deck);
+  // 桅杆
+  const mast=new THREE.Mesh(new THREE.CylinderGeometry(0.16,0.18,8,8),
+    new THREE.MeshStandardMaterial({color:0x4a3119}));
+  mast.position.set(0.6,5,0); g.add(mast);
+  // 帆(faction 色)
+  const sail=new THREE.Mesh(new THREE.PlaneGeometry(4.6,5,8,5),
+    new THREE.MeshStandardMaterial({color:f.color,roughness:.6,side:THREE.DoubleSide,
+      emissive:new THREE.Color(f.color).multiplyScalar(0.15)}));
+  sail.position.set(0.6,5.2,0); sail.rotation.y=Math.PI/2;
+  sail.userData.base=sail.geometry.attributes.position.array.slice();
+  sail.userData.wave=Math.random()*10;
+  g.add(sail); flagMeshes.push(sail);
+  // 小旗
+  if(withFlag){
+    const flag=makeFlag(f.lord==='曹操'?'曹':f.lord==='孫權'?'孫':'劉', f.color, 6);
+    flag.position.set(-2.6,1.4,0); flag.scale.setScalar(0.8); g.add(flag);
+  }
+  g.scale.setScalar(scale);
+  g.userData={faction, isShip:true, baseY:0,
+    name:f.name+' 戰船', desc:`主將:${f.lord} · ${f.cmd}`};
+  return g;
+}
+
+/* ---------- 火船 ---------- */
+function makeFireShip(){
+  const g=makeShip('sun',1.1,false);
+  // 薪草堆
+  const straw=new THREE.Mesh(new THREE.BoxGeometry(4.5,1.6,2.4),
+    new THREE.MeshStandardMaterial({color:0xb08a3a,roughness:1,emissive:0x3a2400}));
+  straw.position.set(0.5,2.0,0); g.add(straw);
+  g.userData={faction:'sun', isShip:true, name:'黃蓋火船', desc:'滿載薪草膏油 · 詐降突入'};
+  return g;
+}
+
+/* ---------- 粒子系統(火/煙/餘燼/霧/風) ---------- */
+const PVERT=`
+  attribute float size; attribute float alpha; attribute vec3 pcolor;
+  varying float vA; varying vec3 vC;
+  void main(){ vA=alpha; vC=pcolor;
+    vec4 mv=modelViewMatrix*vec4(position,1.0);
+    gl_PointSize=size*(320.0/max(1.0,-mv.z));
+    gl_Position=projectionMatrix*mv; }`;
+const PFRAG=`
+  uniform sampler2D map; varying float vA; varying vec3 vC;
+  void main(){ vec4 t=texture2D(map,gl_PointCoord);
+    gl_FragColor=vec4(vC,1.0)*t; gl_FragColor.a*=vA;
+    if(gl_FragColor.a<0.01) discard; }`;
+
+function makeParticles(count, blending){
+  const geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(count*3).fill(-99999),3));
+  geo.setAttribute('pcolor',new THREE.BufferAttribute(new Float32Array(count*3),3));
+  geo.setAttribute('size',new THREE.BufferAttribute(new Float32Array(count),1));
+  geo.setAttribute('alpha',new THREE.BufferAttribute(new Float32Array(count),1));
+  const mat=new THREE.ShaderMaterial({uniforms:{map:{value:particleTex}},
+    vertexShader:PVERT,fragmentShader:PFRAG,transparent:true,depthWrite:false,blending});
+  const pts=new THREE.Points(geo,mat); pts.frustumCulled=false;
+  const parts=[]; for(let i=0;i<count;i++) parts.push({life:0,max:1,vx:0,vy:0,vz:0,grow:0});
+  pts.userData={parts};
+  return pts;
+}
+function spawnParticle(sys, x,y,z, opt){
+  const P=sys.userData.parts;
+  for(let i=0;i<P.length;i++){ if(P[i].life<=0){
+    const p=P[i];
+    p.life=p.max=opt.life; p.vx=opt.vx; p.vy=opt.vy; p.vz=opt.vz; p.grow=opt.grow||0;
+    const pos=sys.geometry.attributes.position.array;
+    const col=sys.geometry.attributes.pcolor.array;
+    const sz=sys.geometry.attributes.size.array;
+    pos[i*3]=x; pos[i*3+1]=y; pos[i*3+2]=z;
+    col[i*3]=opt.c[0]; col[i*3+1]=opt.c[1]; col[i*3+2]=opt.c[2];
+    sz[i]=opt.size;
+    return;
+  }}
+}
+function updateParticles(sys, dt, fade){
+  const P=sys.userData.parts;
+  const pos=sys.geometry.attributes.position.array;
+  const al=sys.geometry.attributes.alpha.array;
+  const sz=sys.geometry.attributes.size.array;
+  for(let i=0;i<P.length;i++){
+    const p=P[i];
+    if(p.life>0){
+      p.life-=dt;
+      pos[i*3]+=p.vx*dt; pos[i*3+1]+=p.vy*dt; pos[i*3+2]+=p.vz*dt;
+      sz[i]+=p.grow*dt;
+      al[i]=Math.max(0,p.life/p.max)*fade;
+    } else { al[i]=0; pos[i*3+1]=-99999; }
+  }
+  sys.geometry.attributes.position.needsUpdate=true;
+  sys.geometry.attributes.alpha.needsUpdate=true;
+  sys.geometry.attributes.size.needsUpdate=true;
+}
+
+/* ---------- 飛箭 ---------- */
+function makeArrow(){
+  const g=new THREE.Group();
+  const shaft=new THREE.Mesh(new THREE.CylinderGeometry(0.06,0.06,2.2,5),
+    new THREE.MeshBasicMaterial({color:0xcdb892}));
+  shaft.rotation.z=Math.PI/2; g.add(shaft);
+  const tip=new THREE.Mesh(new THREE.ConeGeometry(0.16,0.5,5),
+    new THREE.MeshBasicMaterial({color:0x999999}));
+  tip.rotation.z=-Math.PI/2; tip.position.x=1.3; g.add(tip);
+  g.visible=false;
+  g.userData={active:false, t:0, dur:1, from:new THREE.Vector3(), to:new THREE.Vector3(),
+    arc:14, fire:false, glow:null};
+  // 火箭光點
+  const glow=new THREE.Mesh(new THREE.SphereGeometry(0.4,8,6),
+    new THREE.MeshBasicMaterial({color:0xff7820,transparent:true,opacity:.9}));
+  glow.visible=false; g.add(glow); g.userData.glow=glow;
+  scene.add(g);
+  return g;
+}
+function launchArrow(from,to,opt={}){
+  for(const a of arrowPool){ if(!a.userData.active){
+    const u=a.userData;
+    u.active=true; u.t=0; u.dur=opt.dur||(0.7+Math.random()*0.4);
+    u.from.copy(from); u.to.copy(to);
+    u.arc=opt.arc!=null?opt.arc:(10+Math.random()*8);
+    u.fire=!!opt.fire; a.visible=true; u.glow.visible=u.fire;
+    return a;
+  }}
+}
+function updateArrows(dt){
+  for(const a of arrowPool){
+    const u=a.userData; if(!u.active) continue;
+    u.t+=dt/u.dur;
+    if(u.t>=1){ u.active=false; a.visible=false;
+      if(u.fire){ // 命中起火
+        spawnFireBurst(u.to.x,u.to.y,u.to.z, 8);
+      }
+      continue;
+    }
+    const t=u.t;
+    a.position.lerpVectors(u.from,u.to,t);
+    a.position.y += Math.sin(Math.PI*t)*u.arc;
+    // 朝向速度方向
+    const ahead=Math.min(1,t+0.02);
+    const nx=THREE.MathUtils.lerp(u.from.x,u.to.x,ahead);
+    const ny=THREE.MathUtils.lerp(u.from.y,u.to.y,ahead)+Math.sin(Math.PI*ahead)*u.arc;
+    const nz=THREE.MathUtils.lerp(u.from.z,u.to.z,ahead);
+    a.lookAt(nx,ny,nz);
+    a.rotateY(Math.PI/2);
+    if(u.fire){
+      spawnParticle(emberSys, a.position.x,a.position.y,a.position.z,
+        {life:0.5,vx:0,vy:2,vz:0,size:5,c:[1,0.5,0.1]});
+    }
+  }
+}
+function spawnFireBurst(x,y,z,n){
+  for(let i=0;i<n;i++){
+    const a=Math.random()*Math.PI*2, s=4+Math.random()*6;
+    spawnParticle(fireSys,x,y,z,{life:0.6+Math.random()*0.4,
+      vx:Math.cos(a)*s*0.4,vy:3+Math.random()*4,vz:Math.sin(a)*s*0.4,
+      size:8+Math.random()*6,grow:6,c:[1,0.55,0.12]});
+  }
+}
+
+/* ===================================================================== */
+function init(){
+  scene=new THREE.Scene();
+  renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});
+  renderer.setSize(innerWidth,innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure=1.05;
+  $('#app').appendChild(renderer.domElement);
+
+  camera=new THREE.PerspectiveCamera(52,innerWidth/innerHeight,0.5,3000);
+  camera.position.set(210,170,250);
+
+  controls=new OrbitControls(camera,renderer.domElement);
+  controls.enableDamping=true; controls.dampingFactor=0.06;
+  controls.maxPolarAngle=Math.PI*0.49; controls.minDistance=25; controls.maxDistance=620;
+  controls.target.set(0,0,0);
+  controls.addEventListener('start',()=>{ userControlling=true;
+    if(autoCamera){ autoCamera=false; $('#t-cam').classList.remove('on'); }});
+  controls.addEventListener('end',()=>{ userReleaseT=clock?clock.getElapsedTime():0; userControlling=false; });
+
+  clock=new THREE.Clock();
+  raycaster=new THREE.Raycaster(); pointer=new THREE.Vector2();
+  particleTex=makeCircleTexture();
+
+  buildLights();
+  buildSky();
+  buildTerrain();
+  buildWater();
+  buildLandmarks();
+  buildPlaceLabels();
+  buildFleets();
+  buildEffectsSystems();
+
+  // 方向指示大箭頭
+  directionArrow=makeDirectionArrow();
+  scene.add(directionArrow);
+
+  addEventListener('resize',onResize);
+  renderer.domElement.addEventListener('pointermove',onPointerMove);
+  renderer.domElement.addEventListener('pointerdown',onPointerDown);
+
+  buildUI();
+  animate();
+}
+
+/* ---------- 燈光 ---------- */
+function buildLights(){
+  scene.add(new THREE.HemisphereLight(0xbcd2ee,0x40342a,0.9));
+  const sun=new THREE.DirectionalLight(0xfff0d0,1.15);
+  sun.position.set(-200,300,160); scene.add(sun);
+  scene.userData.sun=sun;
+  const fill=new THREE.DirectionalLight(0x6688bb,0.35);
+  fill.position.set(160,120,-200); scene.add(fill);
+}
+
+/* ---------- 天空 ---------- */
+function buildSky(){
+  const geo=new THREE.SphereGeometry(1500,32,18);
+  const mat=new THREE.ShaderMaterial({ side:THREE.BackSide, depthWrite:false,
+    uniforms:{top:{value:new THREE.Color(0x16294a)},bottom:{value:new THREE.Color(0x9fb6cc)}},
+    vertexShader:`varying vec3 vW; void main(){ vW=position;
+      gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+    fragmentShader:`varying vec3 vW; uniform vec3 top; uniform vec3 bottom;
+      void main(){ float h=normalize(vW).y; float t=pow(max(h,0.0),0.55);
+      gl_FragColor=vec4(mix(bottom,top,t),1.0);} `});
+  sky=new THREE.Mesh(geo,mat); scene.add(sky);
+  scene.fog=new THREE.Fog(0x9fb6cc,260,900);
+}
+
+/* ---------- 地形 ---------- */
+function buildTerrain(){
+  // 大地(綠褐)
+  const g=new THREE.PlaneGeometry(1400,1000,80,60);
+  const pos=g.attributes.position;
+  for(let i=0;i<pos.count;i++){
+    const x=pos.getX(i), y=pos.getY(i);
+    let h=0;
+    const distRiver=Math.abs(y); // y 在旋轉前對應 world Z
+    if(distRiver>60){
+      h=Math.sin(x*0.012)*Math.cos(y*0.014)*6 + Math.sin(x*0.03+y*0.02)*3;
+      h+=Math.max(0,(distRiver-60))*0.04;
+    }
+    pos.setZ(i,h);
+  }
+  g.computeVertexNormals();
+  const mat=new THREE.MeshStandardMaterial({color:0x4a6738,roughness:1,flatShading:false});
+  const ground=new THREE.Mesh(g,mat); ground.rotation.x=-Math.PI/2; ground.position.y=-0.6;
+  scene.add(ground);
+
+  // 河岸沙洲(沿河兩側淺色帶)
+  const bankMat=new THREE.MeshStandardMaterial({color:0x7d6f4a,roughness:1});
+  [62,-62].forEach(z=>{
+    const b=new THREE.Mesh(new THREE.PlaneGeometry(1400,26),bankMat);
+    b.rotation.x=-Math.PI/2; b.position.set(0,-0.2,z*1.0);
+    scene.add(b);
+  });
+}
+
+/* ---------- 水面(長江) ---------- */
+function buildWater(){
+  const g=new THREE.PlaneGeometry(1400,120,140,28);
+  const mat=new THREE.MeshStandardMaterial({color:0x1d4f7a,roughness:0.25,metalness:0.55,
+    transparent:true,opacity:0.92, emissive:0x07182a});
+  water=new THREE.Mesh(g,mat); water.rotation.x=-Math.PI/2; water.position.y=0;
+  water.userData.base=g.attributes.position.array.slice();
+  scene.add(water);
+}
+
+/* ---------- 地標(赤壁紅崖 / 烏林林地 / 七星壇 / 山) ---------- */
+function buildLandmarks(){
+  // 赤壁紅崖(南岸西側)
+  const cliffMat=new THREE.MeshStandardMaterial({color:0x9c3b2a,roughness:.9});
+  for(let i=0;i<7;i++){
+    const h=18+Math.random()*26;
+    const c=new THREE.Mesh(new THREE.BoxGeometry(14+Math.random()*10,h,12+Math.random()*8),cliffMat);
+    c.position.set(-210+i*16+Math.random()*6, h/2-1, -78-Math.random()*26);
+    c.rotation.y=Math.random()*0.5; scene.add(c);
+  }
+  // 「赤壁」摩崖大字
+  const red=makeLabel('赤壁',{fs:90,color:'#ffd9c0',serif:true,scale:26});
+  red.position.set(-185,42,-86); scene.add(red); labelSprites.push(red);
+
+  // 烏林林地(北岸樹叢) + 曹營帳篷
+  const treeMat=new THREE.MeshStandardMaterial({color:0x2f5230,roughness:1});
+  const trunkMat=new THREE.MeshStandardMaterial({color:0x4a3119});
+  for(let i=0;i<60;i++){
+    const x=-220+Math.random()*440, z=92+Math.random()*120;
+    const tk=new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.7,4),trunkMat);
+    tk.position.set(x,1.4,z); scene.add(tk);
+    const cr=new THREE.Mesh(new THREE.ConeGeometry(3+Math.random()*1.5,7+Math.random()*3,7),treeMat);
+    cr.position.set(x,6+Math.random()*1.5,z); scene.add(cr);
+  }
+  buildCamp(-30,118,'cao',10);   // 曹營(北)
+  buildCamp(0,-120,'sun',7);     // 聯軍營(南)
+  buildCamp(150,-118,'liu',5);   // 劉備營(南東)
+
+  // 七星壇(南屏山,借東風)
+  const altarMat=new THREE.MeshStandardMaterial({color:0x6b5a8a,roughness:.7,emissive:0x271d3a});
+  for(let i=0;i<3;i++){
+    const s=12-i*3;
+    const tier=new THREE.Mesh(new THREE.CylinderGeometry(s,s+1,3,7),altarMat);
+    tier.position.set(-150,1.5+i*3,-108); scene.add(tier);
+  }
+  const altarLabel=makeLabel('七星壇',{fs:48,color:'#d9c8ff',bg:'rgba(40,28,70,.7)',scale:9});
+  altarLabel.position.set(-150,24,-108); scene.add(altarLabel); labelSprites.push(altarLabel);
+
+  // 遠山
+  const mtMat=new THREE.MeshStandardMaterial({color:0x39506a,roughness:1,fog:true});
+  for(let i=0;i<14;i++){
+    const m=new THREE.Mesh(new THREE.ConeGeometry(50+Math.random()*40,80+Math.random()*70,6),mtMat);
+    const side=i%2?1:-1;
+    m.position.set(-560+i*80, 20, side*(360+Math.random()*120));
+    scene.add(m);
+  }
+}
+
+function buildCamp(x,z,faction,n){
+  const f=FACTION[faction];
+  const tentMat=new THREE.MeshStandardMaterial({color:0xcfc3a4,roughness:.95});
+  for(let i=0;i<n;i++){
+    const tx=x+(Math.random()-0.5)*60, tz=z+(Math.random()-0.5)*34;
+    const tent=new THREE.Mesh(new THREE.ConeGeometry(3.4,4.5,4),tentMat);
+    tent.rotation.y=Math.PI/4; tent.position.set(tx,2,tz); scene.add(tent);
+  }
+  // 主將大旗
+  const ch = faction==='cao'?'曹':faction==='sun'?'孫':'劉';
+  const flag=makeFlag(ch,f.color,14); flag.position.set(x,0,z); flag.scale.setScalar(1.6);
+  scene.add(flag);
+  // 將領姓名牌(實色背景)
+  const lbl2=makeLabel(`☗ ${f.lord}`,{fs:44,color:'#fff',
+    bg:faction==='cao'?'rgba(59,125,216,.82)':faction==='sun'?'rgba(227,64,59,.82)':'rgba(54,173,85,.82)',
+    border:'rgba(255,255,255,.6)',scale:7.5});
+  lbl2.position.set(x,20,z); scene.add(lbl2); labelSprites.push(lbl2);
+}
+
+/* ---------- 地名標示 ---------- */
+function buildPlaceLabels(){
+  const places=[
+    {t:'長江',x:230,z:0,fs:64,c:'#bfe6ff',scale:18},
+    {t:'烏林（曹營水寨）',x:-30,z:150,fs:42,c:'#bcd6ff',scale:11},
+    {t:'赤壁（聯軍大營）',x:30,z:-150,fs:42,c:'#ffc8c4',scale:11},
+    {t:'江陵',x:-330,z:80,fs:40,c:'#dfe8f5',scale:9},
+    {t:'夏口',x:300,z:-92,fs:40,c:'#cdeccd',scale:9},
+    {t:'樊口',x:215,z:-150,fs:38,c:'#cdeccd',scale:8},
+    {t:'華容道',x:-150,z:165,fs:40,c:'#f0d6c0',scale:9}
+  ];
+  for(const p of places){
+    const s=makeLabel(p.t,{fs:p.fs,color:p.c,bg:'rgba(10,16,28,.55)',scale:p.scale});
+    s.position.set(p.x, 14, p.z); scene.add(s); labelSprites.push(s);
+    s.userData.place=true;
+  }
+  // 華容道路徑(虛線)
+  const pts=[]; for(let i=0;i<=20;i++){ const t=i/20;
+    pts.push(new THREE.Vector3(-40-t*150, 0.5, 120+t*60)); }
+  const path=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineDashedMaterial({color:0xe8c46a,dashSize:4,gapSize:3,transparent:true,opacity:0}));
+  path.computeLineDistances(); path.userData.huarong=true; scene.add(path);
+  scene.userData.huarongPath=path;
+}
+
+/* ---------- 艦隊布署 ---------- */
+function buildFleets(){
+  chainGroup=new THREE.Group(); scene.add(chainGroup);
+  fireShipGroup=new THREE.Group(); scene.add(fireShipGroup);
+
+  // 曹軍:北岸大艦隊(6×5)
+  let idx=0;
+  for(let r=0;r<5;r++) for(let c=0;c<6;c++){
+    const s=makeShip('cao',1.0);
+    s.position.set(-95+c*34, 0, 56+r*15);
+    s.rotation.y=Math.PI; // 朝南
+    s.userData.home=s.position.clone();
+    s.userData.gridR=r; s.userData.gridC=c; s.userData.idx=idx++;
+    scene.add(s); caoShips.push(s); pickables.push(s);
+  }
+  // 聯軍:南岸艦隊(5×3)紅綠混編
+  idx=0;
+  for(let r=0;r<3;r++) for(let c=0;c<5;c++){
+    const fac = (c%5===4)?'liu':'sun';
+    const s=makeShip(fac,1.0);
+    s.position.set(-70+c*30, 0, -58-r*15);
+    s.userData.home=s.position.clone();
+    s.userData.idx=idx++;
+    scene.add(s); allyShips.push(s); pickables.push(s);
+  }
+  // 火船 ×6(初始隱藏於聯軍前)
+  for(let i=0;i<6;i++){
+    const fs=makeFireShip();
+    fs.position.set(-50+i*22, 0, -52);
+    fs.rotation.y=0; // 朝北(衝向曹軍)
+    fs.userData.home=fs.position.clone();
+    fs.visible=false;
+    fireShipGroup.add(fs);
+  }
+  buildChains();
+}
+
+/* 連環鐵索(連接曹船,預設隱藏) */
+function buildChains(){
+  const mat=new THREE.LineBasicMaterial({color:0x33414f,transparent:true,opacity:0});
+  const plankMat=new THREE.MeshStandardMaterial({color:0x6b4a2a,roughness:.9,transparent:true,opacity:0});
+  for(let r=0;r<5;r++) for(let c=0;c<6;c++){
+    const a=caoShips.find(s=>s.userData.gridR===r&&s.userData.gridC===c);
+    if(c<5){ const b=caoShips.find(s=>s.userData.gridR===r&&s.userData.gridC===c+1);
+      addPlank(a,b,plankMat); }
+    if(r<4){ const b=caoShips.find(s=>s.userData.gridR===r+1&&s.userData.gridC===c);
+      addPlank(a,b,plankMat); }
+  }
+}
+function addPlank(a,b,mat){
+  const mid=a.position.clone().add(b.position).multiplyScalar(0.5);
+  const len=a.position.distanceTo(b.position);
+  const plank=new THREE.Mesh(new THREE.BoxGeometry(len,0.4,1.1),mat.clone());
+  plank.position.copy(mid); plank.position.y=2.4;
+  plank.lookAt(b.position.x,2.4,b.position.z);
+  plank.rotateY(Math.PI/2);
+  plank.userData.chain=true;
+  chainGroup.add(plank);
+}
+
+/* ---------- 特效系統 ---------- */
+function buildEffectsSystems(){
+  fireSys =makeParticles(900, THREE.AdditiveBlending); scene.add(fireSys);
+  emberSys=makeParticles(400, THREE.AdditiveBlending); scene.add(emberSys);
+  smokeSys=makeParticles(500, THREE.NormalBlending);   scene.add(smokeSys);
+  fogSys  =makeParticles(300, THREE.NormalBlending);   scene.add(fogSys);
+  windSys =makeParticles(260, THREE.AdditiveBlending);  scene.add(windSys);
+  for(let i=0;i<40;i++) arrowPool.push(makeArrow());
+
+  // 東風大箭頭群(借東風/火攻時顯示)
+  windArrowsGroup=new THREE.Group(); windArrowsGroup.visible=false; scene.add(windArrowsGroup);
+  const wmat=new THREE.MeshBasicMaterial({color:0xfff0c0,transparent:true,opacity:0.5});
+  for(let i=0;i<5;i++){
+    const ar=new THREE.Group();
+    const shaft=new THREE.Mesh(new THREE.CylinderGeometry(0.8,0.8,40,8),wmat);
+    shaft.rotation.x=Math.PI/2; ar.add(shaft);
+    const head=new THREE.Mesh(new THREE.ConeGeometry(3,7,10),wmat);
+    head.rotation.x=Math.PI/2; head.position.z=23; ar.add(head);
+    ar.position.set(-120+i*55, 28, -30);
+    ar.userData.baseZ=-30; ar.userData.phase=i;
+    windArrowsGroup.add(ar);
+  }
+}
+
+/* ---------- 方向指示大箭頭(陣型移動方向) ---------- */
+function makeDirectionArrow(){
+  const g=new THREE.Group();
+  const mat=new THREE.MeshBasicMaterial({color:COL.gold,transparent:true,opacity:0.85});
+  const shaft=new THREE.Mesh(new THREE.BoxGeometry(34,1.2,5),mat);
+  g.add(shaft);
+  const head=new THREE.Mesh(new THREE.ConeGeometry(6,12,4),mat);
+  head.rotation.z=-Math.PI/2; head.position.x=22; g.add(head);
+  g.visible=false; g.position.y=10;
+  return g;
+}
+function setDirectionArrow(x,z,angle,show){
+  directionArrow.visible=show;
+  if(!show) return;
+  directionArrow.position.set(x,12,z);
+  directionArrow.rotation.y=angle;
+}
+
+/* ===================================================================== */
+/* 套用某一幕                                                            */
+function applyPhase(i, instant=false){
+  currentPhase=i; phaseElapsed=0;
+  const ph=PHASES[i];
+
+  // 鏡頭目標
+  camPos.set(...ph.cam.p); camLook.set(...ph.cam.t);
+  if(instant){ camera.position.copy(camPos); controls.target.copy(camLook); }
+
+  // 天空 / 霧
+  const [b,t]=ph.sky;
+  animColor(sky.material.uniforms.bottom.value, new THREE.Color(b));
+  animColor(sky.material.uniforms.top.value, new THREE.Color(t));
+  if(ph.fog){ animColor(scene.fog.color,new THREE.Color(ph.fog[0]));
+    scene.fog.near=ph.fog[1]; scene.fog.far=ph.fog[2]; }
+
+  // 風
+  setWind(ph.wind);
+
+  // 文字面板
+  dom.era.textContent=ph.era;
+  dom.phName.textContent=ph.name;
+  dom.phNo.textContent=`第 ${i+1} 幕 / 共 ${PHASES.length} 幕 · ${ph.sub}`;
+  dom.phDesc.textContent=ph.desc;
+  if(ph.strat){ dom.strat.style.display='block';
+    dom.stratNm.textContent=ph.strat.name; dom.stratDs.textContent=ph.strat.desc; }
+  else dom.strat.style.display='none';
+
+  // 戰力卡
+  renderForces(ph.forces);
+  // 事件快報
+  renderEvents(ph.events);
+  // 時間軸
+  updateTimelineUI();
+
+  // 連環索顯示(連環計起)
+  const chained = i>=5;
+  chainGroup.children.forEach(p=>{ animOpacity(p.material, chained?0.9:0, 0.8); });
+  // 連環計後曹船貼近
+  caoShips.forEach(s=>{
+    const home=s.userData.home;
+    const tgt = chained ? new THREE.Vector3(home.x*0.92, 0, 54+s.userData.gridR*12)
+                        : home.clone();
+    s.userData.moveTo=tgt;
+  });
+
+  // 各種劇情效果
+  resetDynamic();
+  const fx=ph.fx||{};
+  const st=ph.strat||{};
+
+  if(fx.caoMove) setDirectionArrow(40,5, Math.PI/2, true);           // 曹軍南征(向赤壁)
+  if(fx.ally)    setDirectionArrow(120,-95, Math.PI, true);          // 聯軍西上集結
+  if(fx.volley)  scene.userData.volley=true;                          // 對射
+  if(fx.fog)     scene.userData.fogMode=true;                         // 草船借箭濃霧
+  if(fx.borrowArrows) scene.userData.borrow=true;
+  if(st.wind || fx.wind) windArrowsGroup.visible=true;                // 借東風
+  if(st.fire || fx.fire){ scene.userData.fireMode=true; windArrowsGroup.visible=true; startFireAttack(); }
+  if(fx.rout)    startRout();
+
+  // 計策大字幕
+  if(ph.strat) triggerBanner(ph.strat.name, ph.sub);
+
+  // 七星壇高亮 + 華容道
+  scene.userData.huarongPath.material.opacity = (i===9)?0.9:0;
+}
+
+function resetDynamic(){
+  scene.userData.volley=false;
+  scene.userData.fogMode=false;
+  scene.userData.borrow=false;
+  scene.userData.fireMode=false;
+  scene.userData.routMode=false;
+  windArrowsGroup.visible=false;
+  setDirectionArrow(0,0,0,false);
+  fireEmitters.length=0;
+  // 火船歸位隱藏
+  fireShipGroup.children.forEach((fs,k)=>{ fs.visible=false;
+    fs.position.copy(fs.userData.home); fs.userData.sailing=false; fs.userData.burning=false; });
+  // 曹船熄火復原
+  caoShips.forEach(s=>{ s.userData.burning=false; s.visible=true; });
+}
+
+/* 火攻啟動 */
+function startFireAttack(){
+  fireShipGroup.children.forEach((fs,k)=>{
+    fs.visible=true; fs.userData.sailing=true; fs.userData.burning=true;
+    fs.userData.t=0; fs.position.copy(fs.userData.home);
+    // 目標:衝入曹軍陣列前緣
+    fs.userData.target=new THREE.Vector3(-90+k*30, 0, 54);
+  });
+  // 指定部分曹船為燃燒源
+  caoShips.forEach((s,i)=>{ if(i<24){ s.userData.burning=true;
+    fireEmitters.push(s.position); } });
+}
+
+/* 潰敗 */
+function startRout(){
+  scene.userData.routMode=true;
+  // 殘餘曹船多數沉沒(隱藏),少數北逃
+  caoShips.forEach((s,i)=>{ if(i%5!==0){ s.visible=false; }
+    else { s.userData.moveTo=new THREE.Vector3(s.position.x-30,0,s.position.z+40); }});
+  setDirectionArrow(-110,150, Math.PI*0.8, true); // 華容道北逃方向
+}
+
+/* ---------- 風 ---------- */
+function setWind(w){
+  const rad=(w.deg)*Math.PI/180;
+  // deg:風「來向」,0=北。風吹向 = 反向
+  windDir.set(Math.sin(rad+Math.PI),0,Math.cos(rad+Math.PI)).normalize();
+  dom.windArrow.style.transform=`translate(-50%,-100%) rotate(${w.deg}deg)`;
+  dom.wtxt.textContent=w.txt; dom.wsub.textContent=w.sub;
+  windStrength = w.txt.includes('東南')?1.3 : w.txt.includes('微風')?0.25 : 0.5;
+}
+
+/* ---------- 漸變工具 ---------- */
+const tweens=[];
+function animColor(target,to,dur=1.2){ tweens.push({type:'color',target,from:target.clone(),to,t:0,dur}); }
+function animOpacity(mat,to,dur=1){ tweens.push({type:'opacity',target:mat,from:mat.opacity,to,t:0,dur}); }
+function updateTweens(dt){
+  for(let i=tweens.length-1;i>=0;i--){ const tw=tweens[i]; tw.t+=dt/tw.dur;
+    const k=Math.min(1,tw.t); const e=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;
+    if(tw.type==='color') tw.target.copy(tw.from).lerp(tw.to,e);
+    else if(tw.type==='opacity'){ tw.target.opacity=tw.from+(tw.to-tw.from)*e;
+      tw.target.transparent=true; }
+    if(k>=1) tweens.splice(i,1);
+  }
+}
+
+/* ---------- 計策大字幕 ---------- */
+function triggerBanner(name,sub){
+  dom.banner.querySelector('.bn-name').textContent=name;
+  dom.banner.querySelector('.bn-sub').textContent=sub;
+  dom.banner.classList.remove('show'); void dom.banner.offsetWidth;
+  dom.banner.classList.add('show');
+}
+
+/* ===================================================================== */
+/* UI                                                                    */
+function renderForces(forces){
+  const order=['cao','sun','liu'];
+  dom.forces.innerHTML='<div class="hd">各 軍 戰 力</div>';
+  for(const k of order){
+    const f=FACTION[k], d=forces[k];
+    const pct=Math.max(4,Math.round(d.n/TROOP_MAX*100));
+    const el=document.createElement('div'); el.className='fc';
+    el.innerHTML=`
+      <div class="row1">
+        <span class="dot" style="background:${f.css};color:${f.css}"></span>
+        <span class="lord" style="color:${f.css}">${f.lord}</span>
+        <span class="cmd">${f.cmd}</span>
+      </div>
+      <div class="bar"><i style="width:${pct}%;background:linear-gradient(90deg,${f.css},#fff8)"></i></div>
+      <div class="meta"><span>兵力 ${ (d.n/10000).toFixed(0) } 萬</span><span>船艦 ${d.ships}</span></div>
+      <div class="status">▸ ${d.s}</div>
+      <div class="gens">${f.gens}</div>`;
+    dom.forces.appendChild(el);
+  }
+}
+let evTimer=null;
+function renderEvents(list){
+  dom.events.innerHTML='';
+  list.forEach((t,i)=>{
+    setTimeout(()=>{ if(currentPhaseEventsMatch(list)){
+      const li=document.createElement('li'); li.textContent=t;
+      li.style.animationDelay='0s'; dom.events.appendChild(li);
+      while(dom.events.children.length>5) dom.events.removeChild(dom.events.firstChild);
+    }}, i*900);
+  });
+}
+function currentPhaseEventsMatch(list){ return PHASES[currentPhase].events===list; }
+
+function buildTimeline(){
+  const track=dom.track;
+  PHASES.forEach((ph,i)=>{
+    const node=document.createElement('div'); node.className='tl-node';
+    node.style.left=`${(i/(PHASES.length-1))*100}%`;
+    node.innerHTML=`<div class="dot"></div><div class="lab">${ph.name}</div>`;
+    node.addEventListener('click',()=>{ goToPhase(i); });
+    track.appendChild(node);
+  });
+}
+function updateTimelineUI(){
+  const nodes=dom.track.querySelectorAll('.tl-node');
+  nodes.forEach((n,i)=>{ n.classList.toggle('active',i===currentPhase);
+    n.classList.toggle('done',i<currentPhase); });
+  const base=currentPhase/(PHASES.length-1);
+  const seg=(phaseElapsed/PHASE_DUR)/(PHASES.length-1);
+  dom.prog.style.width=`${Math.min(100,(base+ (autoPlay?seg:0))*100)}%`;
+}
+
+function buildUI(){
+  buildTimeline();
+  // 開場模式
+  document.querySelectorAll('#intro .mode-btn').forEach(b=>{
+    b.addEventListener('click',()=>startShow(b.dataset.mode));
+  });
+  // 播放控制
+  dom.play.addEventListener('click',togglePlay);
+  $('#prev').addEventListener('click',()=>goToPhase(Math.max(0,currentPhase-1)));
+  $('#next').addEventListener('click',()=>goToPhase(Math.min(PHASES.length-1,currentPhase+1)));
+  const speeds=[1,2,0.5]; let si=0;
+  $('#speed').addEventListener('click',()=>{ si=(si+1)%speeds.length; playSpeed=speeds[si];
+    $('#speed').textContent=`速度 ${playSpeed}×`; });
+  // 工具
+  $('#t-cam').addEventListener('click',()=>{ autoCamera=!autoCamera;
+    $('#t-cam').classList.toggle('on',autoCamera);
+    if(autoCamera){ camPos.set(...PHASES[currentPhase].cam.p); camLook.set(...PHASES[currentPhase].cam.t); }});
+  $('#t-label').addEventListener('click',()=>{ labelsVisible=!labelsVisible;
+    $('#t-label').classList.toggle('on',labelsVisible);
+    labelSprites.forEach(s=>s.visible=labelsVisible); });
+  $('#t-help').addEventListener('click',()=>{ dom.hint.style.opacity = dom.hint.style.opacity==='0'?'1':'0'; });
+  // 結束選項
+  $('#replay').addEventListener('click',()=>{ dom.ending.style.display='none'; goToPhase(0); autoPlay=true; setPlayBtn(); });
+  $('#explore').addEventListener('click',()=>{ dom.ending.style.display='none';
+    autoPlay=false; setPlayBtn(); autoCamera=false; $('#t-cam').classList.remove('on'); });
+}
+
+function startShow(mode){
+  started=true;
+  dom.intro.style.display='none';
+  applyPhase(0,true);
+  if(mode==='auto'){ autoPlay=true; autoCamera=true; }
+  else { autoPlay=false; autoCamera=true; }
+  setPlayBtn();
+  // 提示 8 秒後淡出
+  setTimeout(()=>{ dom.hint.style.opacity='0'; },8000);
+}
+function togglePlay(){ autoPlay=!autoPlay;
+  if(autoPlay && currentPhase===PHASES.length-1) goToPhase(0);
+  setPlayBtn(); }
+function setPlayBtn(){ dom.play.textContent=autoPlay?'⏸':'▶'; }
+function goToPhase(i){ dom.ending.style.display='none'; applyPhase(i,false); }
+
+/* ===================================================================== */
+function onResize(){ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight); }
+
+function onPointerMove(e){ pointer.x=(e.clientX/innerWidth)*2-1; pointer.y=-(e.clientY/innerHeight)*2+1;
+  scene.userData.mx=e.clientX; scene.userData.my=e.clientY; }
+function onPointerDown(e){
+  raycaster.setFromCamera(pointer,camera);
+  const hit=raycaster.intersectObjects(pickables,true);
+  if(hit.length){ let o=hit[0].object; while(o && !o.userData.isShip) o=o.parent;
+    if(o){ showPick(o,e.clientX,e.clientY); return; } }
+  dom.pick.style.display='none';
+}
+function showPick(ship,x,y){
+  dom.pick.querySelector('.pk-nm').textContent=ship.userData.name;
+  dom.pick.querySelector('.pk-nm').style.color=FACTION[ship.userData.faction].css;
+  dom.pick.querySelector('.pk-ds').textContent=ship.userData.desc;
+  dom.pick.style.display='block';
+  dom.pick.style.left=Math.min(innerWidth-240,x+14)+'px';
+  dom.pick.style.top=Math.min(innerHeight-90,y+14)+'px';
+  clearTimeout(scene.userData.pickT);
+  scene.userData.pickT=setTimeout(()=>dom.pick.style.display='none',3500);
+}
+
+/* ===================================================================== */
+let volleyT=0, fogT=0, borrowT=0, windPT=0;
+function animate(){
+  requestAnimationFrame(animate);
+  const dt=Math.min(0.05,clock.getDelta());
+  const et=clock.getElapsedTime();
+
+  updateTweens(dt);
+  controls.update();
+
+  // 自動播放推進
+  if(started && autoPlay){
+    phaseElapsed += dt*playSpeed;
+    if(phaseElapsed>=PHASE_DUR){
+      if(currentPhase<PHASES.length-1) applyPhase(currentPhase+1,false);
+      else { autoPlay=false; setPlayBtn(); dom.ending.style.display='flex'; }
+    }
+    updateTimelineUI();
+  }
+
+  // 自動運鏡(含緩慢環繞)
+  if(autoCamera && started){
+    const ph=PHASES[currentPhase];
+    const orbit=ph.cam.orbit||0;
+    const ang=et*orbit;
+    const off=new THREE.Vector3(camPos.x-camLook.x, 0, camPos.z-camLook.z);
+    const ca=Math.cos(ang), sa=Math.sin(ang);
+    const ox=off.x*ca-off.z*sa, oz=off.x*sa+off.z*ca;
+    const desired=new THREE.Vector3(camLook.x+ox, camPos.y, camLook.z+oz);
+    camera.position.lerp(desired, 1-Math.pow(0.0001,dt));
+    controls.target.lerp(camLook, 1-Math.pow(0.0008,dt));
+  }
+
+  // 水波
+  animateWater(et);
+  // 旗 / 帆飄動
+  animateFlags(et);
+
+  // 曹船移動(連環貼近 / 潰逃)
+  [...caoShips,...allyShips].forEach(s=>{ if(s.userData.moveTo){
+    s.position.lerp(s.userData.moveTo,1-Math.pow(0.02,dt)); }});
+
+  // 風粒子
+  updateWind(dt,et);
+
+  // 對射
+  if(scene.userData.volley){ volleyT-=dt; if(volleyT<=0){ volleyT=0.18;
+    fireVolley(); }}
+
+  // 草船借箭
+  if(scene.userData.borrow){ borrowT-=dt; if(borrowT<=0){ borrowT=0.05;
+    borrowArrows(); }}
+
+  // 濃霧
+  if(scene.userData.fogMode){ fogT-=dt; if(fogT<=0){ fogT=0.08; emitFog(); }}
+
+  // 火攻
+  if(scene.userData.fireMode){ updateFireAttack(dt); }
+  // 永遠更新粒子
+  updateParticles(fireSys,dt, 1);
+  updateParticles(emberSys,dt, 1);
+  updateParticles(smokeSys,dt, 0.55);
+  updateParticles(fogSys,dt, 0.5);
+  updateParticles(windSys,dt, 0.8);
+  updateArrows(dt);
+
+  // 火光照(火攻時)
+  if(scene.userData.fireMode){ scene.userData.sun.intensity=0.7+Math.sin(et*12)*0.15; }
+  else scene.userData.sun.intensity=1.15;
+
+  // 標籤面向(sprite 自動面向);讓地名隨距離淡出過遠的
+  renderer.render(scene,camera);
+}
+
+function animateWater(t){
+  const pos=water.geometry.attributes.position, base=water.userData.base;
+  for(let i=0;i<pos.count;i++){
+    const x=base[i*3], y=base[i*3+1];
+    const z=Math.sin(x*0.05+t*1.3)*0.7 + Math.cos(y*0.08+t*1.7)*0.5
+           + Math.sin((x+y)*0.03+t*0.8)*0.6;
+    pos.setZ(i,z);
+  }
+  pos.needsUpdate=true;
+}
+function animateFlags(t){
+  for(const f of flagMeshes){
+    const pos=f.geometry.attributes.position, base=f.userData.base;
+    const w=f.userData.wave;
+    for(let i=0;i<pos.count;i++){
+      const x=base[i*3], y=base[i*3+1];
+      const amp=(x+ (f.geometry.parameters.width/2))*0.18; // 旗尾擺動較大
+      pos.setZ(i, Math.sin(x*1.4 - t*6 + w)*0.4*amp + Math.sin(y*2+t*5)*0.12);
+    }
+    pos.needsUpdate=true;
+  }
+}
+
+/* 風粒子 + 東風大箭頭 */
+function updateWind(dt,et){
+  // 持續發射風的流線
+  if(Math.random()<windStrength){
+    const sx=(Math.random()-0.5)*500, sz=-160-Math.random()*60, sy=8+Math.random()*40;
+    spawnParticle(windSys, sx,sy,sz, {life:2.5,
+      vx:windDir.x*(40+Math.random()*40),vy:0,vz:windDir.z*(40+Math.random()*40),
+      size:3+Math.random()*3, c:[0.9,0.95,1.0]});
+  }
+  if(windArrowsGroup.visible){
+    windArrowsGroup.children.forEach((ar,i)=>{
+      ar.position.z = ar.userData.baseZ + ((et*30 + i*30)%180) - 60;
+      ar.lookAt(ar.position.x+windDir.x*10, ar.position.y, ar.position.z+windDir.z*10);
+    });
+  }
+}
+
+/* 兩軍對射 */
+function fireVolley(){
+  const fromCao=Math.random()<0.5;
+  const a=fromCao?caoShips:allyShips, b=fromCao?allyShips:caoShips;
+  const s=a[Math.floor(Math.random()*a.length)], e=b[Math.floor(Math.random()*b.length)];
+  if(!s.visible||!e.visible) return;
+  launchArrow(s.position.clone().setY(6), e.position.clone().setY(4), {arc:18});
+}
+
+/* 草船借箭:曹軍向南岸草船齊射 */
+function borrowArrows(){
+  const target=new THREE.Vector3(5+(Math.random()-0.5)*40, 4, 60+(Math.random()-0.5)*20);
+  const s=caoShips[Math.floor(Math.random()*caoShips.length)];
+  if(s&&s.visible) launchArrow(s.position.clone().setY(6), target, {arc:12,dur:0.6});
+}
+
+/* 濃霧粒子 */
+function emitFog(){
+  for(let k=0;k<4;k++){
+    const x=(Math.random()-0.5)*240, z=(Math.random()-0.5)*120, y=2+Math.random()*14;
+    spawnParticle(fogSys, x,y,z, {life:5, vx:windDir.x*4,vy:0.4,vz:windDir.z*4,
+      size:60+Math.random()*50, grow:18, c:[0.85,0.88,0.92]});
+  }
+}
+
+/* 火攻更新 */
+function updateFireAttack(dt){
+  // 火船航行
+  fireShipGroup.children.forEach((fs)=>{
+    if(fs.userData.sailing){
+      fs.userData.t=Math.min(1,(fs.userData.t||0)+dt*0.28);
+      fs.position.lerpVectors(fs.userData.home, fs.userData.target, fs.userData.t);
+      fs.lookAt(fs.userData.target.x,0,fs.userData.target.z);
+      // 火船尾焰
+      spawnParticle(fireSys, fs.position.x,3,fs.position.z,
+        {life:0.7,vx:0,vy:5,vz:0,size:10,grow:8,c:[1,0.5,0.12]});
+      if(fs.userData.t>=1){ fs.userData.sailing=false; }
+    }
+  });
+  // 燃燒中的曹船噴火/冒煙
+  for(let k=0;k<fireEmitters.length;k++){
+    const p=fireEmitters[k];
+    if(Math.random()<0.7) spawnParticle(fireSys, p.x+(Math.random()-0.5)*5, 2+Math.random()*3, p.z+(Math.random()-0.5)*4,
+      {life:0.8+Math.random()*0.5, vx:(Math.random()-0.5)*2+windDir.x*3, vy:6+Math.random()*6, vz:(Math.random()-0.5)*2+windDir.z*3,
+       size:9+Math.random()*9, grow:8, c:[1,0.45+Math.random()*0.3,0.1]});
+    if(Math.random()<0.4) spawnParticle(smokeSys, p.x+(Math.random()-0.5)*6, 6, p.z+(Math.random()-0.5)*5,
+      {life:3+Math.random()*2, vx:windDir.x*8, vy:7+Math.random()*4, vz:windDir.z*8,
+       size:24+Math.random()*20, grow:30, c:[0.12,0.11,0.1]});
+    if(Math.random()<0.25) spawnParticle(emberSys, p.x,3,p.z,
+      {life:1.5,vx:windDir.x*14+(Math.random()-0.5)*6,vy:8+Math.random()*8,vz:windDir.z*14,
+       size:3,c:[1,0.6,0.15]});
+  }
+  // 火箭/火砲齊射(偶發)
+  if(Math.random()<0.15){
+    const s=allyShips[Math.floor(Math.random()*allyShips.length)];
+    const e=fireEmitters[Math.floor(Math.random()*fireEmitters.length)];
+    if(s&&s.visible&&e) launchArrow(s.position.clone().setY(6), e.clone().setY(4), {fire:true,arc:20});
+  }
+}
+
+/* 啟動 */
+function boot(){
+  // 等字型就緒(地名/旗幟清晰)
+  let p=0; const iv=setInterval(()=>{ p=Math.min(95,p+8+Math.random()*10);
+    dom.loadbar.style.width=p+'%'; },120);
+  const ready=()=>{
+    init();
+    clearInterval(iv); dom.loadbar.style.width='100%';
+    dom.loadmsg.textContent='佈署完成 ▸ 點擊開始';
+    setTimeout(()=>{ dom.loader.style.opacity='0'; dom.loader.style.transition='opacity .6s';
+      setTimeout(()=>{ dom.loader.style.display='none'; dom.intro.style.display='flex'; },600);
+    },350);
+  };
+  if(document.fonts && document.fonts.ready){
+    Promise.race([document.fonts.ready, new Promise(r=>setTimeout(r,2500))]).then(ready);
+  } else setTimeout(ready,500);
+}
+boot();
+</script>
+</body>
+</html>
